@@ -17,11 +17,19 @@ static const int kStateKey;
 
 #define _UIKeyboardFrameEndUserInfoKey (&UIKeyboardFrameEndUserInfoKey != NULL ? UIKeyboardFrameEndUserInfoKey : @"UIKeyboardBoundsUserInfoKey")
 
+typedef struct {
+    BOOL keyboardVisible;
+    CGRect keyboardRect;
+        // BOOL keyboardAnimationInProgress;
+} TPKeyboardAvoidingGlobalState ;
+
+static TPKeyboardAvoidingGlobalState __TPKeyboardAvoidingGlobalState;
+
 @interface TPKeyboardAvoidingState : NSObject
 @property (nonatomic, assign) UIEdgeInsets priorInset;
 @property (nonatomic, assign) UIEdgeInsets priorScrollIndicatorInsets;
 @property (nonatomic, assign) BOOL         keyboardVisible;
-@property (nonatomic, assign) CGRect       keyboardRect;
+    //@property (nonatomic, assign) CGRect       keyboardRect;
 @property (nonatomic, assign) CGSize       priorContentSize;
 @property (nonatomic, assign) BOOL         priorPagingEnabled;
 @property (nonatomic, assign) BOOL         ignoringNotifications;
@@ -45,6 +53,7 @@ static const int kStateKey;
 - (void)TPKeyboardAvoiding_keyboardWillShow:(NSNotification*)notification {
     CGRect keyboardRect = [self convertRect:[[[notification userInfo] objectForKey:_UIKeyboardFrameEndUserInfoKey] CGRectValue] fromView:nil];
     if (CGRectIsEmpty(keyboardRect)) {
+        __TPKeyboardAvoidingGlobalState.keyboardVisible = NO;
         self.keyboardAvoidingState.keyboardVisible = NO;
         return;
     }
@@ -55,15 +64,17 @@ static const int kStateKey;
         return;
     }
     
-    state.keyboardRect = keyboardRect;
+    __TPKeyboardAvoidingGlobalState.keyboardRect = keyboardRect;
     
-    if ( !state.keyboardVisible ) {
+    if ( !self.keyboardAvoidingState.keyboardVisible ) {
         state.priorInset = self.contentInset;
         state.priorScrollIndicatorInsets = self.scrollIndicatorInsets;
         state.priorPagingEnabled = self.pagingEnabled;
     }
     
-    state.keyboardVisible = YES;
+    __TPKeyboardAvoidingGlobalState.keyboardVisible = YES;
+    self.keyboardAvoidingState.keyboardVisible = YES;
+
     self.pagingEnabled = NO;
         
     if ( [self isKindOfClass:[TPKeyboardAvoidingScrollView class]] ) {
@@ -115,6 +126,7 @@ static const int kStateKey;
 
 - (void)TPKeyboardAvoiding_keyboardWillHide:(NSNotification*)notification {
     CGRect keyboardRect = [self convertRect:[[[notification userInfo] objectForKey:_UIKeyboardFrameEndUserInfoKey] CGRectValue] fromView:nil];
+
     if (CGRectIsEmpty(keyboardRect) && !self.keyboardAvoidingState.keyboardAnimationInProgress) {
         return;
     }
@@ -125,12 +137,13 @@ static const int kStateKey;
         return;
     }
     
-    if ( !state.keyboardVisible ) {
+    if ( !self.keyboardAvoidingState.keyboardVisible ) {
         return;
     }
     
-    state.keyboardRect = CGRectZero;
-    state.keyboardVisible = NO;
+    __TPKeyboardAvoidingGlobalState.keyboardRect = CGRectZero;
+    __TPKeyboardAvoidingGlobalState.keyboardVisible = NO;
+    self.keyboardAvoidingState.keyboardVisible = NO;
     
     // Restore dimensions to prior size
     [UIView beginAnimations:nil context:NULL];
@@ -149,15 +162,15 @@ static const int kStateKey;
 }
 
 - (void)TPKeyboardAvoiding_updateContentInset {
-    TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
-    if ( state.keyboardVisible ) {
+        //TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
+    if ( __TPKeyboardAvoidingGlobalState.keyboardVisible ) {
         self.contentInset = [self TPKeyboardAvoiding_contentInsetForKeyboard];
     }
 }
 
 - (void)TPKeyboardAvoiding_updateFromContentSizeChange {
     TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
-    if ( state.keyboardVisible ) {
+    if ( __TPKeyboardAvoidingGlobalState.keyboardVisible ) {
 		state.priorContentSize = self.contentSize;
         self.contentInset = [self TPKeyboardAvoiding_contentInsetForKeyboard];
     }
@@ -189,7 +202,7 @@ static const int kStateKey;
 -(void)TPKeyboardAvoiding_scrollToActiveTextField {
     TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
     
-    if ( !state.keyboardVisible ) return;
+    if ( !__TPKeyboardAvoidingGlobalState.keyboardVisible ) return;
     
     // Ignore any keyboard notification that occur while we scroll
     //  (seems to be an iOS 9 bug that causes jumping text in UITextField)
@@ -318,9 +331,9 @@ static const int kStateKey;
 
 
 - (UIEdgeInsets)TPKeyboardAvoiding_contentInsetForKeyboard {
-    TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
+        //TPKeyboardAvoidingState *state = self.keyboardAvoidingState;
     UIEdgeInsets newInset = self.contentInset;
-    CGRect keyboardRect = state.keyboardRect;
+    CGRect keyboardRect = __TPKeyboardAvoidingGlobalState.keyboardRect;
     newInset.bottom = keyboardRect.size.height - MAX((CGRectGetMaxY(keyboardRect) - CGRectGetMaxY(self.bounds)), 0);
     return newInset;
 }
